@@ -30,6 +30,10 @@ export default {
     loadFromStorage: {
       type: Boolean,
       default: false,
+    },
+    origImage: {
+      type: String,
+      default: "",
     }
   },
   emits: ['getImageUrl', 'new-edit', 'reset-storage'],
@@ -44,20 +48,28 @@ export default {
   watch: {
     imageSrc(newValue) {
       localStorage.clear()
-      localStorage.setItem(`edit-0`, newValue)
       this.$emit('reset-storage')
       const image = new Image();
       image.src = newValue
       image.addEventListener("load", () => {
         this.drawOnImage(image)
       })
+      this.imageUrl = this.canvas.toDataURL("image/png")
+      this.$emit("getImageUrl", this.imageUrl)
+      this.saveEdit()
     },
     iteration(newValue) {
-      console.log("why")
       if (this.loadFromStorage) {
-        const imageUrl = localStorage.getItem(`edit-${newValue}`)
-        const img = new Image();
-        img.src = imageUrl
+        const url = localStorage.getItem(`edit-${newValue}`)
+        const img = new Image()
+        if (newValue === 0) {
+          img.src = this.origImage
+          this.$emit('getImageUrl', this.origImage)
+        }
+        else {
+          img.src = url
+          this.$emit('getImageUrl', url)
+        }
         img.addEventListener("load", () => {
           this.drawOnImage(img)
         })
@@ -76,7 +88,14 @@ export default {
         this.canvas.height = imageHeight
         this.canvas.width = imageWidth;
         this.context.drawImage(image, 0, 0, imageWidth, imageHeight);
+
       }
+    },
+    saveEdit() {
+      this.canvas.toBlob((blob) => {
+        const url = URL.createObjectURL(blob);
+        localStorage.setItem(`edit-${this.iteration}`, url);
+      })
     },
     applyBlur(x, y) {
       const radius = this.size /16; // Радиус размытия
@@ -147,8 +166,11 @@ export default {
         this.isDrawing = false
         this.imageUrl = this.canvas.toDataURL("image/png")
         this.$emit("getImageUrl", this.imageUrl)
-        localStorage.setItem(`edit-${this.iteration + 1}`, this.imageUrl)
         this.$emit('new-edit')
+        this.saveEdit()
+        for(let i = this.iteration + 1; i < localStorage.length; i++) {
+          localStorage.removeItem(`edit-${i}`)
+        }
       }
     },
     draw(e) {
