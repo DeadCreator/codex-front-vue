@@ -18,10 +18,8 @@ export const useImageStore = defineStore('images', {
             this.newUpload = value
         },
         removeRedos() {
-            if ((this.imageEdits.length - this.iteration) > 1) {
-                for (let i = this.iteration; i < this.imageEdits.length; i++) {
-                    this.imageEdits.pop()
-                }
+            while ((this.imageEdits.length - this.iteration) > 1) {
+                this.imageEdits.pop()
             }
         },
         resetEdits() {

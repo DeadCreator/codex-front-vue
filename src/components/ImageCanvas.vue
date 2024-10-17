@@ -36,7 +36,7 @@ export default {
         })
         store.newUploaded(false)
       } else {
-        store.updateImageEdits(this.iteration, this.canvas.toDataURL("image/png"))
+        store.updateImageEdits(this.iteration, this.imgUrl)
       }
     },
     iteration() {
