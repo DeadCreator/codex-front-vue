@@ -2,47 +2,33 @@
 
 import UIButton from "@/components/UI/UIButton.vue";
 import UIH2 from "@/components/UI/UIH2.vue";
+import {useImageStore} from "@/stores/ImageStore";
+import {mapState} from "pinia";
 
 export default {
   name: "EditPanel",
   components: {
     UIButton, UIH2
   },
-  props: {
-    imageSaveUrl: {
-      type: String,
-      default: "",
-    },
-    isBlurring: {
-      type: Boolean,
-      default: false
-    },
-    size: {
-      type: Number,
-      default: 25
-    },
-    iteration: {
-      type: Number,
-      default: 0,
-    }
+  computed: {
+    ...mapState(useImageStore, ['iteration']),
+    ...mapState(useImageStore, ['imageEdits']),
+    ...mapState(useImageStore, ['isBlurring']),
   },
-  emits: [
-      'image-uploaded', 'color-changed',
-    'tool-changed', 'size-changed',
-      'undo-image', 'redo-image',
-
-  ],
   data() {
     return {
       colors: ['red', 'yellow', 'lime', 'deepskyblue', 'purple', 'black', 'white'],
     }
   },
   methods: {
+    useImageStore,
     async imageUpload(e) {
       const file = e.target.files[0];
       if (file) {
         const uri = await this.fileToDataUri(file)
-        this.$emit("image-uploaded", uri)
+        const store = useImageStore()
+        store.updateUrl(uri)
+        store.newUploaded(true)
       }
     },
     fileToDataUri(field) {
@@ -56,11 +42,24 @@ export default {
         reader.readAsDataURL(field);
       });
     },
-    saveImage(imageHref) {
+    saveImage() {
       const saveBtn = document.getElementById("save");
-      saveBtn.href = imageHref
-      saveBtn.download = "EternalImage"
+      const store = useImageStore();
+      saveBtn.href = store.imgUrl
+      saveBtn.download = "EternalImage" + Math.floor(new Date().getTime() / 1000)
     },
+    undoCanvas(multiplier) {
+      if (this.iteration > 0) {
+        const store = useImageStore();
+        store.updateIteration(multiplier);
+      }
+    },
+    redoCanvas(multiplier) {
+      if (this.imageEdits.length > this.iteration + 1) {
+        const store = useImageStore();
+        store.updateIteration(multiplier);
+      }
+    }
   }
 }
 
@@ -70,26 +69,27 @@ export default {
   <div class="edit-panel">
     <u-i-h2>Tool</u-i-h2>
     <div class="tools">
-      <u-i-button @click="$emit('tool-changed', false)" id="brush-tool">Brush</u-i-button>
-      <u-i-button @click="$emit('tool-changed', true)" id="blur-tool">Blur</u-i-button>
+      <u-i-button @click="() => {useImageStore().updateMode(false)}" id="brush-tool">Brush</u-i-button>
+      <u-i-button @click="() => {useImageStore().updateMode(true)}" id="blur-tool">Blur</u-i-button>
     </div>
     <u-i-h2 v-bind:class ="isBlurring ? 'hide ' : 'nothing'">Color</u-i-h2>
     <div v-bind:class="isBlurring ? 'hide' : 'nothing'" class="colors color-scheme">
-      <button @click="$emit('color-changed', color)" v-for="color in colors" :key="color" :class="color"></button>
+      <button @click="() => {useImageStore().updateColor(color)}" v-for="color in colors" :key="color" :class="color"></button>
     </div>
     <u-i-h2>Size</u-i-h2>
     <label class="brush-size">
-      <input @change="(e) => {$emit('size-changed', e.target.value)}"
+      <input @change="(e) => {useImageStore().updateSize(e.target.value)}"
              id="tool-size" :value="this.size" min="10" max="100" type="range">
     </label>
     <div class="controls">
       <label>Upload Image
         <input @change="imageUpload" id="file-input" type="file">
       </label>
-      <a download="" id="save" @click="saveImage(imageSaveUrl)">Save</a>
-      <u-i-button @click="$emit('undo-image')">Undo</u-i-button>
-      <u-i-button @click="$emit('redo-image')">Redo</u-i-button>
+      <a download="" id="save" @click="saveImage()">Save</a>
+      <u-i-button @click="undoCanvas(-1)">Undo</u-i-button>
+      <u-i-button @click="redoCanvas(1)">Redo</u-i-button>
     </div>
+<!--    {{ imageEdits }}-->
   </div>
 </template>
 

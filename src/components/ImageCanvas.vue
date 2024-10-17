@@ -1,85 +1,56 @@
 <script>
 
-//
-// eslint-disable-next-line no-undef
-
+import {useImageStore} from "@/stores/ImageStore";
+import {mapState} from "pinia";
 
 export default {
   name: "ImageCanvas",
-  props: {
-    imageSrc: {
-      type: String,
-      default: "",
-    },
-    color: {
-      type: String,
-      default: "black",
-    },
-    isBlurring: {
-      type: Boolean,
-      default: false,
-    },
-    size: {
-      type: Number,
-      default: 25,
-    },
-    iteration: {
-      type: Number,
-      default: 0,
-    },
-    loadFromStorage: {
-      type: Boolean,
-      default: false,
-    },
-    origImage: {
-      type: String,
-      default: "",
-    }
+  computed: {
+    ...mapState(useImageStore, ['imgUrl']),
+    ...mapState(useImageStore, ['imageEdits']),
+    ...mapState(useImageStore, ['isDrawing']),
+    ...mapState(useImageStore, ['isBlurring']),
+    ...mapState(useImageStore, ['iteration']),
+    ...mapState(useImageStore, ['newUpload']),
+    ...mapState(useImageStore, ['color']),
+    ...mapState(useImageStore, ['size']),
   },
-  emits: ['getImageUrl', 'new-edit', 'reset-storage'],
   data() {
     return {
       canvas: null,
       context: null,
       ground: null,
-      isDrawing: false,
     }
   },
   watch: {
-    imageSrc(newValue) {
-      localStorage.clear()
-      this.$emit('reset-storage')
-      const image = new Image();
-      image.src = newValue
-      image.addEventListener("load", () => {
-        this.drawOnImage(image)
-      })
-      this.imageUrl = this.canvas.toDataURL("image/png")
-      this.$emit("getImageUrl", this.imageUrl)
-      this.saveEdit()
-    },
-    iteration(newValue) {
-      if (this.loadFromStorage) {
-        const url = localStorage.getItem(`edit-${newValue}`)
-        const img = new Image()
-        if (newValue === 0) {
-          img.src = this.origImage
-          this.$emit('getImageUrl', this.origImage)
-        }
-        else {
-          img.src = url
-          this.$emit('getImageUrl', url)
-        }
-        img.addEventListener("load", () => {
-          this.drawOnImage(img)
+    imgUrl() {
+      const store = useImageStore();
+      if (this.newUpload) {
+        store.resetEdits()
+
+        const image = new Image();
+        image.src = this.imgUrl
+        image.addEventListener("load", () => {
+          this.drawOnImage(image)
+          store.updateImageEdits(0, this.canvas.toDataURL("image/png"))
         })
+        store.newUploaded(false)
+      } else {
+        store.updateImageEdits(this.iteration, this.canvas.toDataURL("image/png"))
       }
-    }
+    },
+    iteration() {
+      const store = useImageStore();
+      const image = new Image();
+      image.src = this.imageEdits[this.iteration];
+      image.onload = () => {
+        this.context.drawImage(image, 0, 0, this.canvas.width, this.canvas.height)
+        store.updateUrl(this.canvas.toDataURL("image/png"))
+      }
+    },
   },
   methods: {
     drawOnImage(image = null) {
-      // if an image is present,
-      // the image passed as a parameter is drawn in the canvas
       if (image) {
         const ratio = image.width / image.height;
         const imageHeight = this.ground.clientHeight
@@ -88,14 +59,7 @@ export default {
         this.canvas.height = imageHeight
         this.canvas.width = imageWidth;
         this.context.drawImage(image, 0, 0, imageWidth, imageHeight);
-
       }
-    },
-    saveEdit() {
-      this.canvas.toBlob((blob) => {
-        const url = URL.createObjectURL(blob);
-        localStorage.setItem(`edit-${this.iteration}`, url);
-      })
     },
     applyBlur(x, y) {
       const radius = this.size /16; // Радиус размытия
@@ -156,25 +120,9 @@ export default {
       this.context.putImageData(blurredData, x - radius, y - radius);
     },
     startDrawing(e) {
-      if (this.imageSrc) {
-        this.isDrawing = true
-        this.draw(e)
-      }
-    },
-    stopDrawing() {
-      if (this.isDrawing) {
-        this.isDrawing = false
-        this.imageUrl = this.canvas.toDataURL("image/png")
-        this.$emit("getImageUrl", this.imageUrl)
-        this.$emit('new-edit')
-        this.saveEdit()
-        for(let i = this.iteration + 1; i < localStorage.length; i++) {
-          localStorage.removeItem(`edit-${i}`)
-        }
-      }
-    },
-    draw(e) {
-      if (this.isDrawing) {
+      if (this.imgUrl) {
+        const store = useImageStore();
+        store.switchDrawing(true)
         const posX = e.pageX - this.canvas.offsetLeft;
         const posY = e.pageY - this.canvas.offsetTop;
 
@@ -184,13 +132,31 @@ export default {
         this.context.lineJoin = "round";
         this.context.lineCap = "round";
         this.context.moveTo(posX, posY);
+        this.draw(e)
+      }
+    },
+    stopDrawing() {
+      if (this.isDrawing) {
+        const store = useImageStore();
+        store.switchDrawing(false)
+        store.updateIteration(1)
+        store.updateUrl(this.canvas.toDataURL("image/png"))
+        store.updateImageEdits(this.iteration, this.canvas.toDataURL("image/png"))
+        store.removeRedos()
+      }
+    },
+    draw(e) {
+      if (this.isDrawing) {
+        const posX = e.pageX - this.canvas.offsetLeft;
+        const posY = e.pageY - this.canvas.offsetTop;
 
         if (this.isBlurring) {
           this.applyBlur(posX, posY);
         } else {
-          this.context.lineTo(posX, posY);
           this.context.stroke();
         }
+        this.context.lineTo(posX, posY);
+
       }
     },
   },
@@ -204,11 +170,13 @@ export default {
 </script>
 
 <template>
-  <div ref="shit" class="ground">
+  <div class="ground">
     <canvas @mousedown="startDrawing"
             @mousemove="draw"
             @mouseleave="stopDrawing"
-            @mouseup="stopDrawing" id="canvas"></canvas>
+            @mouseup="stopDrawing"
+            id="canvas">
+    </canvas>
   </div>
 </template>
 
