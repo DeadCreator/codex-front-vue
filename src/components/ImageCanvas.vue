@@ -14,12 +14,18 @@ export default {
     ...mapState(useImageStore, ['newUpload']),
     ...mapState(useImageStore, ['color']),
     ...mapState(useImageStore, ['size']),
+
   },
   data() {
     return {
       canvas: null,
       context: null,
       ground: null,
+      kernel: [
+          [0.0625, 0.125, 0.0625],
+          [0.125, 0.25, 0.125],
+          [0.0625, 0.125, 0.0625],
+      ]
     }
   },
   watch: {
@@ -62,62 +68,82 @@ export default {
       }
     },
     applyBlur(x, y) {
-      const radius = this.size /16; // Радиус размытия
-      const imageData = this.context.getImageData(
-          x - radius,
-          y - radius,
-          radius * 2 + 1,
-          radius * 2 + 1
-      );
+      const sizeRoot = Math.floor(Math.sqrt(this.size))
+      const d = sizeRoot % 2 === 0 ?
+          (sizeRoot + 1) * 3 :
+          sizeRoot * 3
+      const radius = Math.floor((d - 1) / 2)
 
-      // Создаем временный canvas для размытия
-      const tempCanvas = document.createElement("canvas");
-      tempCanvas.width = radius * 2 + 1;
-      tempCanvas.height = radius * 2 + 1;
+      if (x - radius > 0 && y - radius > 0 &&
+          this.canvas.width - x - radius > 0 && this.canvas.height - y - radius > 0) {
+        const imageData = this.context.getImageData(
+            x - radius,
+            y - radius,
+            d,
+            d
+        );
 
-      const tempCtx = tempCanvas.getContext("2d");
+        const centerX = Math.floor(d / 2);
+        const centerY = Math.floor(d / 2);
+        const imagePixels = imageData.data
+        const blurredData = this.context.createImageData(d, d)
+        blurredData.data.set(imagePixels)
+        const blurData = blurredData.data
 
-      // Рисуем на временном canvas
-      tempCtx.putImageData(imageData, 0, 0);
+        for (let j = 4*d; j < imagePixels.length - 4*d; j += 12*d) {
+          for (let i = 4; i < (d - 1) * 4; i+=12) {
+            const matrix_id = [
+              i+j-4-4*d, i+j-4*d, i+j+4-4*d,
+              i+j-4,     i+j,     i+j+4,
+              i+j-4+4*d, i+j+4*d, i+j+4+4*d
+            ]
 
-      // Применяем размытие (например, Gaussian Blur)
-      tempCtx.globalAlpha = 0.5; // Уровень прозрачности для эффекта размытия
-      tempCtx.drawImage(
-          tempCanvas,
-          -radius / 4,
-          -radius / 4,
-          radius * 2.5,
-          radius * 2.5
-      );
+            const avg0 =
+                imagePixels[i-4-4*d+j] * this.kernel[0][0] + imagePixels[i-4*d + 4+j] * this.kernel[0][1] + imagePixels[i-4*d+4 + 8+j] * this.kernel[0][2] +
+                imagePixels[i-4+j] * this.kernel[1][0]+ imagePixels[i + 4+j] * this.kernel[1][1] + imagePixels[i+4 + 8+j] * this.kernel[1][2]+
+                imagePixels[i+4+4*d+j] * this.kernel[2][0] + imagePixels[i+4*d + 4+j] * this.kernel[2][1] + imagePixels[i+4*d+4 + 8+j] * this.kernel[2][2]
 
-      // Получаем данные изображения с размытого canvas и накладываем их обратно на основной canvas
-      const blurredData = tempCtx.getImageData(
-          0,
-          0,
-          tempCanvas.width,
-          tempCanvas.height
-      );
+            const avg1 =
+                imagePixels[i-4-4*d + 1+j] * this.kernel[0][0] + imagePixels[i-4*d + 5+j] * this.kernel[0][1] + imagePixels[i-4*d+4 + 9+j] * this.kernel[0][2] +
+                imagePixels[i-4 + 1+j] * this.kernel[1][0]+ imagePixels[i + 5+j] * this.kernel[1][1] + imagePixels[i+4 + 9+j] * this.kernel[1][2]+
+                imagePixels[i+4+4*d + 1+j] * this.kernel[2][0] + imagePixels[i+4*d + 5+j] * this.kernel[2][1] + imagePixels[i+4*d+4 + 9+j] * this.kernel[2][2]
 
-      const r = radius * 2 + 1
+            const avg2 =
+                imagePixels[i-4-4*d + 2+j] * this.kernel[0][0] + imagePixels[i-4*d + 6+j] * this.kernel[0][1] + imagePixels[i-4*d+4 + 10+j]  * this.kernel[0][2] +
+                imagePixels[i-4 + 2+j] * this.kernel[1][0]+ imagePixels[i + 6+j] * this.kernel[1][1] + imagePixels[i+4 + 10+j] * this.kernel[1][2] +
+                imagePixels[i+4+4*d + 2+j] * this.kernel[2][0] + imagePixels[i+4*d + 6+j] * this.kernel[2][1] + imagePixels[i+4*d+4 + 10+j] * this.kernel[2][2]
 
-      const centerX = Math.floor(r / 2);
-      const centerY = Math.floor(r / 2);
-      const blurData = blurredData.data
-      const imagePixels = imageData.data
+            const avg3 =
+                imagePixels[i-4-4*d + 3+j] * this.kernel[0][0] + imagePixels[i-4*d + 7+j] * this.kernel[0][1] + imagePixels[i-4*d+4 + 11+j]* this.kernel[0][2] +
+                imagePixels[i-4 + 3+j] * this.kernel[1][0]+ imagePixels[i + 7+j] * this.kernel[1][1] + imagePixels[i+4 + 11+j] * this.kernel[1][2] +
+                imagePixels[i+4+4*d + 3+j] * this.kernel[2][0] + imagePixels[i+4*d + 7+j] * this.kernel[2][1] + imagePixels[i+4*d+4 + 11+j] * this.kernel[2][2]
 
-      for (let i = 0, j = 0; i < blurData.length; i+=4, j++) {
-        const px_x = j % r
-        const px_y = Math.floor(j / r)
-        if (!((px_x - centerX) ** 2 + (px_y - centerY) ** 2 <= radius ** 2)) {
-          blurData[i] = imagePixels[i]
-          blurData[i + 1] = imagePixels[i + 1]
-          blurData[i + 2] = imagePixels[i + 2]
-          blurData[i + 3] = imagePixels[i + 3]
+
+            matrix_id.forEach(index => {
+              blurData[index] = avg0
+              blurData[index + 1] = avg1
+              blurData[index + 2] = avg2
+              blurData[index + 3] = avg3
+            })
+          }
         }
-      }
 
-      // Накладываем размытие на основной canvas
-      this.context.putImageData(blurredData, x - radius, y - radius);
+
+
+        for (let i = 0, j = 0; i < blurData.length; i+=4, j++) {
+          const px_x = j % d
+          const px_y = Math.floor(j / d)
+
+          if (!((px_x - centerX) ** 2 + (px_y - centerY) ** 2 <= radius ** 2)) {
+            blurData[i] = imagePixels[i]
+            blurData[i + 1] = imagePixels[i + 1]
+            blurData[i + 2] = imagePixels[i + 2]
+            blurData[i + 3] = imagePixels[i + 3]
+          }
+        }
+
+        this.context.putImageData(blurredData, x - radius, y - radius);
+      }
     },
     startDrawing(e) {
       if (this.imgUrl) {
@@ -164,6 +190,8 @@ export default {
     this.canvas = document.getElementById("canvas")
     this.context = this.canvas.getContext("2d")
     this.ground = document.querySelector(".ground")
+
+    this.canvas.willUpdateFrequently = true
   }
 }
 
@@ -189,4 +217,6 @@ export default {
     aspect-ratio: 16/9;
     width: 100%;
   }
+
+
 </style>

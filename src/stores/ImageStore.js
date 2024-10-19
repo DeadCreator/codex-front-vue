@@ -10,7 +10,7 @@ export const useImageStore = defineStore('images', {
             isBlurring: false,
             newUpload: false,
             color: "black",
-            size: "15"
+            size: "30",
         }
     },
     actions: {

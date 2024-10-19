@@ -14,6 +14,7 @@ export default {
     ...mapState(useImageStore, ['iteration']),
     ...mapState(useImageStore, ['imageEdits']),
     ...mapState(useImageStore, ['isBlurring']),
+    ...mapState(useImageStore, ['size']),
   },
   data() {
     return {
@@ -78,8 +79,8 @@ export default {
     </div>
     <u-i-h2>Size</u-i-h2>
     <label class="brush-size">
-      <input @change="(e) => {useImageStore().updateSize(e.target.value)}"
-             id="tool-size" :value="this.size" min="10" max="100" type="range">
+      <input @change="(e) => {useImageStore().updateSize(e.target.value); console.log(e.target.value)}"
+             id="tool-size" :value="this.size" min="20" max="100" type="range">
     </label>
     <div class="controls">
       <label>Upload Image
