@@ -10,7 +10,8 @@ export const useImageStore = defineStore('images', {
             isBlurring: false,
             newUpload: false,
             color: "black",
-            size: "30",
+            colors: ['#ff4c4c', '#ffe629', '#10f549', '#35a4ff', '#a467ff', 'black', 'white'],
+            size: "50",
         }
     },
     actions: {

@@ -20,6 +20,7 @@ export default {
     return {
       canvas: null,
       context: null,
+      circle: null,
       ground: null,
       kernel: [
           [0.0625, 0.125, 0.0625],
@@ -147,6 +148,7 @@ export default {
     },
     startDrawing(e) {
       if (this.imgUrl) {
+        this.circle.style.display = 'block';
         const store = useImageStore();
         store.switchDrawing(true)
         const posX = e.pageX - this.canvas.offsetLeft;
@@ -170,26 +172,31 @@ export default {
         store.updateImageEdits(this.iteration, this.canvas.toDataURL("image/png"))
         store.removeRedos()
       }
+      this.circle.style.display = "none";
     },
     draw(e) {
+      const posX = e.pageX - this.canvas.offsetLeft;
+      const posY = e.pageY - this.canvas.offsetTop;
       if (this.isDrawing) {
-        const posX = e.pageX - this.canvas.offsetLeft;
-        const posY = e.pageY - this.canvas.offsetTop;
-
         if (this.isBlurring) {
           this.applyBlur(posX, posY);
         } else {
           this.context.stroke();
         }
         this.context.lineTo(posX, posY);
-
       }
+
+      this.circle.style.position = 'absolute';
+      this.circle.style.display = 'block';
+      this.circle.style.left = e.clientX - this.size / 10 + "px"
+      this.circle.style.top = e.clientY - this.size / 10 + "px"
     },
   },
   mounted() {
     this.canvas = document.getElementById("canvas")
     this.context = this.canvas.getContext("2d")
     this.ground = document.querySelector(".ground")
+    this.circle = document.querySelector(".circle")
 
     this.canvas.willUpdateFrequently = true
   }
@@ -199,12 +206,14 @@ export default {
 
 <template>
   <div class="ground">
-    <canvas @mousedown="startDrawing"
-            @mousemove="draw"
-            @mouseleave="stopDrawing"
-            @mouseup="stopDrawing"
+    <canvas
+        @mousemove="draw"
+        @mousedown="startDrawing"
+        @mouseup="stopDrawing"
+        @mouseleave="stopDrawing"
             id="canvas">
     </canvas>
+    <div :style="`width: ${this.size / 5}px; height: ${this.size / 5}px`" class="circle"></div>
   </div>
 </template>
 
@@ -218,5 +227,16 @@ export default {
     width: 100%;
   }
 
+  .circle {
+    display: none;
+    border-radius: 50%;
+    border: solid 1px white;
+    left: auto;
+    pointer-events: none;
+  }
+
+  canvas:hover {
+    cursor: none;
+  }
 
 </style>
